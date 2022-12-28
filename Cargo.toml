@@ -12,6 +12,19 @@ license = "AGPL-3.0+"
 repository = "https://github.com/kraktus/syn-with-comments"
 version = "0.1.0-dev"
 
-[workspace.dependencies] # same as prettyplease
-proc-macro2 = { version = "1.0", default-features = false }
-syn = { version = "1.0.90", default-features = false, features = ["full"] }
+[workspace.dependencies]
+proc-macro2 = { version = "1.0", default-features = false, features = [
+  "span-locations",
+] }
+syn = { version = "1.0.90", default-features = false, features = [
+  "full",
+  "parsing",
+  "printing",
+  "visit",
+  "visit-mut",
+  "derive",
+  "clone-impls",
+  "extra-traits",
+] }
+quote = "1"
+itertools = "0.10"

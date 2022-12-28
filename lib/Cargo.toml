@@ -16,5 +16,7 @@ keywords.workspace = true
 [dependencies]
 proc-macro2.workspace = true
 syn.workspace = true
+quote.workspace = true
+itertools.workspace = true
 
 [dev-dependencies]
