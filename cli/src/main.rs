@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use proc_macro2::{LineColumn, Span, TokenStream, TokenTree};
+use proc_macro2::{LineColumn, Span, TokenStream, TokenTree,  Group};
 use quote::quote;
 use std::str::FromStr;
 use syn::{visit_mut::VisitMut, ItemImpl};
@@ -26,7 +26,6 @@ fn span_start_end(s: Span) -> (usize, usize) {
     debug_span[6..debug_span.len() - 1]
         .split_once("..")
         .map(|(start, end)| {
-            println!("{start}..{end}");
             (
                 usize::from_str(start).unwrap(),
                 usize::from_str(end).unwrap(),
@@ -37,7 +36,6 @@ fn span_start_end(s: Span) -> (usize, usize) {
 
 fn comments_between(input: &str, end_last_span: usize, end: Span) -> TokenStream {
     let mut between = input[end_last_span..span_start_end(end).0].trim();
-    let mut buf = TokenStream::new();
     if between.is_empty() {
         TokenStream::new()
     } else {
@@ -58,10 +56,15 @@ fn comments_between(input: &str, end_last_span: usize, end: Span) -> TokenStream
 fn handle_token_tree(input: &str, tt: TokenTree, end_last_span: usize) -> TokenStream {
     match tt {
         TokenTree::Group(group) => {
+            println!("In GROUP");
+            // comments between the first delimiter and the first token
             let comments = comments_between(input, end_last_span, group.span());
             let last_span_boundary = span_start_end(group.span()).0 + 1; // plus 1 to get over the brace/parenthesis/space
             let inner_token_stream = handle_token_stream(input, group.stream(), last_span_boundary);
-            quote!(#comments #inner_token_stream)
+            let stream = quote!(#comments #inner_token_stream);
+            let group_with_comments = Group::new(group.delimiter(), stream);
+            quote!(#group_with_comments)
+
         }
         terminal_token => {
             let comments = comments_between(input, end_last_span, terminal_token.span());
@@ -97,8 +100,9 @@ fn main() {
     "#;
 
     let impl_block: TokenStream = syn::parse_str(input).unwrap();
-    let mut cur = 0; //byte_offset(input, impl_block.brace_token.span.start()) + 1;
     println!("without comments debug: {:?}", quote!(#impl_block));
+    println!("without comments: {}", quote!(#impl_block));
+    println!("with comments: {}", handle_token_stream(&input, quote!(#impl_block), 0));
 
     for (one, two) in quote!(#impl_block).into_iter().tuple_windows() {
         let last_one = one.span();
