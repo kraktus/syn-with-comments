@@ -27,4 +27,3 @@ syn = { version = "1.0.90", default-features = false, features = [
   "extra-traits",
 ] }
 quote = "1"
-itertools = "0.10"

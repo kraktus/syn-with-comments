@@ -1,21 +1,7 @@
-use itertools::Itertools;
 use proc_macro2::{Group, LineColumn, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::str::FromStr;
 use syn::{visit_mut::VisitMut, ItemImpl};
-
-fn byte_offset(input: &str, location: LineColumn) -> usize {
-    let mut offset = 0;
-    for _ in 1..location.line {
-        offset += input[offset..].find('\n').unwrap() + 1;
-    }
-    offset
-        + input[offset..]
-            .chars()
-            .take(location.column)
-            .map(char::len_utf8)
-            .sum::<usize>()
-}
 
 // amazing if there is no better way
 // start is included, end is excluded
@@ -116,19 +102,4 @@ fn main() {
         "with comments: {}",
         handle_token_stream(&input, quote!(#impl_block), 0)
     );
-
-    for (one, two) in quote!(#impl_block).into_iter().tuple_windows() {
-        let last_one = one.span();
-        let first_two = two.span();
-        // we need to check if there are comments between
-        println!("{one:?}");
-        println!("{two:?}");
-        println!(
-            "comments between: {}",
-            comments_between(input, span_start_end(last_one).1, first_two)
-        )
-        // let comment = &input[cur..byte_offset(input, first.start())];
-        // cur = byte_offset(input, last.end());
-        // println!("comment: {:?}", comment.trim());
-    }
 }
