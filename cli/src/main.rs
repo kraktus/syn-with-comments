@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use proc_macro2::{LineColumn, Span, TokenStream, TokenTree,  Group};
+use proc_macro2::{Group, LineColumn, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::str::FromStr;
 use syn::{visit_mut::VisitMut, ItemImpl};
@@ -35,7 +35,11 @@ fn span_start_end(s: Span) -> (usize, usize) {
 }
 
 fn comments_between(input: &str, end_last_span: usize, end: Span) -> TokenStream {
-    let mut between = input[end_last_span..span_start_end(end).0].trim();
+    comments_between_raw(input, end_last_span, span_start_end(end).0)
+}
+
+fn comments_between_raw(input: &str, begin: usize, end: usize) -> TokenStream {
+    let mut between = input[begin..end].trim();
     if between.is_empty() {
         TokenStream::new()
     } else {
@@ -60,11 +64,15 @@ fn handle_token_tree(input: &str, tt: TokenTree, end_last_span: usize) -> TokenS
             // comments before the group
             let comments = comments_between(input, end_last_span, group.span());
             let last_span_boundary = span_start_end(group.span()).0 + 1; // plus 1 to get over the brace/parenthesis/space
-            let inner_token_stream = handle_token_stream(input, group.stream(), last_span_boundary);
+            let inner_token_stream = if group.stream().is_empty() {
+                // if the group is empty, the only thing that can be inside is a comment
+                comments_between_raw(input, last_span_boundary, span_start_end(group.span()).1)
+            } else {
+                handle_token_stream(input, group.stream(), last_span_boundary)
+            };
             let stream = quote!(#inner_token_stream);
             let group_with_comments = Group::new(group.delimiter(), stream);
             quote!(#comments #group_with_comments)
-
         }
         terminal_token => {
             let comments = comments_between(input, end_last_span, terminal_token.span());
@@ -97,13 +105,17 @@ fn main() {
     //     }
     // "#;
     let input = r#"(0) // foo
-        ()
+        (// bar
+        )
     "#;
 
     let impl_block: TokenStream = syn::parse_str(input).unwrap();
     println!("without comments debug: {:?}", quote!(#impl_block));
     println!("without comments: {}", quote!(#impl_block));
-    println!("with comments: {}", handle_token_stream(&input, quote!(#impl_block), 0));
+    println!(
+        "with comments: {}",
+        handle_token_stream(&input, quote!(#impl_block), 0)
+    );
 
     for (one, two) in quote!(#impl_block).into_iter().tuple_windows() {
         let last_one = one.span();
