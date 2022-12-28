@@ -35,8 +35,8 @@ fn span_start_end(s: Span) -> (usize, usize) {
         .unwrap()
 }
 
-fn comments_between(input: &str, start: Span, end: Span) -> TokenStream {
-    let mut between = input[span_start_end(start).1..span_start_end(end).0].trim();
+fn comments_between(input: &str, end_last_span: usize, end: Span) -> TokenStream {
+    let mut between = input[end_last_span..span_start_end(end).0].trim();
     let mut buf = TokenStream::new();
     if between.is_empty() {
         TokenStream::new()
@@ -46,18 +46,38 @@ fn comments_between(input: &str, start: Span, end: Span) -> TokenStream {
         let comments = between
             .split('\n')
             .map(str::trim)
-            .filter_map(|comment| (!comment.is_empty()).then(|| quote!(#[comment =  #comment])));
+            .filter(|s| !s.is_empty())
+            .map(|c| &c[2..]) // remove the `//` characters. TODO handle it with more care, inner/outer
+            .map(|comment| quote!(#[comment =  #comment]));
         quote!(#(#comments)*)
     }
 }
 
 // TODO generalise input
 // TODO make this function not recursive
-fn handle_token(input: &str, tt: &TokenTree, end: usize) -> TokenStream {
+fn handle_token_tree(input: &str, tt: TokenTree, end_last_span: usize) -> TokenStream {
     match tt {
-        TokenTree::Group(_) => todo!(),
-        x => todo!(),
+        TokenTree::Group(group) => {
+            let comments = comments_between(input, end_last_span, group.span());
+            let last_span_boundary = span_start_end(group.span()).0 + 1; // plus 1 to get over the brace/parenthesis/space
+            let inner_token_stream = handle_token_stream(input, group.stream(), last_span_boundary);
+            quote!(#comments #inner_token_stream)
+        }
+        terminal_token => {
+            let comments = comments_between(input, end_last_span, terminal_token.span());
+            quote!(#comments #terminal_token)
+        }
     }
+}
+
+fn handle_token_stream(input: &str, ts: TokenStream, mut end_last_span: usize) -> TokenStream {
+    let inner_token_stream = ts.into_iter().map(|(inner_tt)| {
+        let inner_span = inner_tt.span();
+        let res = handle_token_tree(input, inner_tt, end_last_span);
+        end_last_span = span_start_end(inner_span).1;
+        res
+    });
+    quote!(#(#inner_token_stream)*)
 }
 
 fn main() {
@@ -72,15 +92,14 @@ fn main() {
     //         fn g(&self) {}
     //     }
     // "#;
-    let input = r#"(
-        
-        ); // foo
+    let input = r#"() // foo
         ()
     "#;
 
     let impl_block: TokenStream = syn::parse_str(input).unwrap();
     let mut cur = 0; //byte_offset(input, impl_block.brace_token.span.start()) + 1;
-    println!("{:?}", quote!(#impl_block));
+    println!("without comments debug: {:?}", quote!(#impl_block));
+
     for (one, two) in quote!(#impl_block).into_iter().tuple_windows() {
         let last_one = one.span();
         let first_two = two.span();
@@ -89,7 +108,7 @@ fn main() {
         println!("{two:?}");
         println!(
             "comments between: {}",
-            comments_between(input, last_one, first_two)
+            comments_between(input, span_start_end(last_one).1, first_two)
         )
         // let comment = &input[cur..byte_offset(input, first.start())];
         // cur = byte_offset(input, last.end());
