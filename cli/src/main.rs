@@ -57,13 +57,13 @@ fn handle_token_tree(input: &str, tt: TokenTree, end_last_span: usize) -> TokenS
     match tt {
         TokenTree::Group(group) => {
             println!("In GROUP");
-            // comments between the first delimiter and the first token
+            // comments before the group
             let comments = comments_between(input, end_last_span, group.span());
             let last_span_boundary = span_start_end(group.span()).0 + 1; // plus 1 to get over the brace/parenthesis/space
             let inner_token_stream = handle_token_stream(input, group.stream(), last_span_boundary);
-            let stream = quote!(#comments #inner_token_stream);
+            let stream = quote!(#inner_token_stream);
             let group_with_comments = Group::new(group.delimiter(), stream);
-            quote!(#group_with_comments)
+            quote!(#comments #group_with_comments)
 
         }
         terminal_token => {
@@ -74,9 +74,10 @@ fn handle_token_tree(input: &str, tt: TokenTree, end_last_span: usize) -> TokenS
 }
 
 fn handle_token_stream(input: &str, ts: TokenStream, mut end_last_span: usize) -> TokenStream {
-    let inner_token_stream = ts.into_iter().map(|(inner_tt)| {
+    let inner_token_stream = ts.into_iter().map(|inner_tt| {
         let inner_span = inner_tt.span();
         let res = handle_token_tree(input, inner_tt, end_last_span);
+        println!("res {res}");
         end_last_span = span_start_end(inner_span).1;
         res
     });
@@ -95,7 +96,7 @@ fn main() {
     //         fn g(&self) {}
     //     }
     // "#;
-    let input = r#"() // foo
+    let input = r#"(0) // foo
         ()
     "#;
 
