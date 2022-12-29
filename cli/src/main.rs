@@ -1,7 +1,5 @@
 use proc_macro2::{Group, LineColumn, Span, TokenStream, TokenTree};
 use quote::quote;
-use std::str::FromStr;
-use syn::{visit_mut::VisitMut, ItemImpl};
 
 struct CommentsRetriever<'a> {
     input: &'a str,
@@ -58,7 +56,7 @@ impl<'a> CommentsRetriever<'a> {
             // this mean the token has the same span as the previous one, meaning
             // we're in expanded code. We will fast forward until returning to user code
             println!("IN EXPANDED CODE");
-            return tt.into()
+            return tt.into();
         };
 
         match tt {

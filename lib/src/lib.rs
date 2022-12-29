@@ -26,7 +26,7 @@ fn byte_offset(input: &str, location: LineColumn) -> usize {
 struct CommentsRetriever;
 
 impl VisitMut for CommentsRetriever {
-    fn visit_item_mut(&mut self, i: &mut syn::Item) {}
+    fn visit_item_mut(&mut self, _i: &mut syn::Item) {}
 }
 
 fn main() {
