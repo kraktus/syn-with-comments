@@ -3,6 +3,42 @@ use quote::quote;
 use std::str::FromStr;
 use syn::{visit_mut::VisitMut, ItemImpl};
 
+struct CommentsRetriever<'a> {
+    input: &'a str,
+    // proc_macro raw `lo` and `hi` attributes are global, which mean if you use `parse_str` twice on the same str block
+    // you will have contiguous spans. eg: for an input of len 200. first one will be from 0-200, second 200-400.
+    // so we need to calcucate and offset between the span and the position in the input
+    offset: usize,
+    ts: TokenStream,
+}
+
+impl<'a> CommentsRetriever<'a> {
+    fn new(input: &'a str) -> syn::Result<Option<Self>> {
+        let ts: TokenStream = syn::parse_str(input)?;
+        if let Some(first_token) = ts.clone().into_iter().next() {
+            let offset_first_token_in_input = byte_offset(input, first_token.span().start());
+            // FIXME why minus 1 needed
+            let offset = dbg!(span_start(first_token.span())) - dbg!(offset_first_token_in_input) - 1;
+            Ok(Some(Self { input, offset, ts }))
+        } else {
+            Ok(None)
+        }
+    }
+}
+// return the byte offset bewteen `location` and the beginning and `input`
+fn byte_offset(input: &str, location: LineColumn) -> usize {
+    let mut offset = 0;
+    for _ in 1..location.line {
+        offset += input[offset..].find('\n').unwrap() + 1;
+    }
+    offset
+        + input[offset..]
+            .chars()
+            .take(location.column)
+            .map(char::len_utf8)
+            .sum::<usize>()
+}
+
 // amazing if there is no better way
 // start is included, end is excluded
 fn span_start_and_end(s: Span) -> (usize, usize) {
@@ -21,12 +57,12 @@ fn span_start_and_end(s: Span) -> (usize, usize) {
 }
 
 fn span_start(s: Span) -> usize {
-     span_start_and_end(s).0
- }
+    span_start_and_end(s).0
+}
 
- fn span_end(s: Span) -> usize {
-     span_start_and_end(s).1
- }
+fn span_end(s: Span) -> usize {
+    span_start_and_end(s).1
+}
 
 fn comments_between(input: &str, end_last_span: usize, end: Span) -> TokenStream {
     comments_between_raw(input, end_last_span, span_start(end))
@@ -38,7 +74,7 @@ fn comments_between_raw(input: &str, begin: usize, end: usize) -> TokenStream {
         TokenStream::new()
     } else {
         // FIXME why minus 1 needed?
-        between = &between[..between.len() - 1];
+        between = &between[..between.len() -1];
         let comments = between
             .split('\n')
             .map(str::trim)
@@ -87,6 +123,14 @@ fn handle_token_stream(input: &str, ts: TokenStream, mut end_last_span: usize) -
     quote!(#(#inner_token_stream)*)
 }
 
+fn parse_str(input: &str) -> syn::Result<TokenStream> {
+    dbg!(input.len());
+    syn::parse_str(input).map(|ts: TokenStream| {
+        println!("{ts:?}");
+        handle_token_stream(input, quote!(#ts), 0)
+    })
+}
+
 fn main() {
     let input = r#"
         // comment on Thing
@@ -104,15 +148,15 @@ fn main() {
     //     )
     // "#;
 
-    let impl_block: TokenStream = syn::parse_str(input).unwrap();
-    println!("without comments debug: {:?}", quote!(#impl_block));
-    println!("without comments: {}", quote!(#impl_block));
-    println!(
-        "with comments: {}",
-        handle_token_stream(&input, quote!(#impl_block), 0)
-    );
+    // let impl_block: TokenStream = syn::parse_str(input).unwrap();
+    // println!("without comments debug: {:?}", quote!(#impl_block));
+    //println!("without comments: {}", quote!(#impl_block));
+    //println!(
+    //    "with comments: {}",
+    //    handle_token_stream(&input, quote!(#impl_block), 0)
+    //);
+    println!("with comments parse_str: {}", parse_str(input).unwrap());
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -120,6 +164,10 @@ mod tests {
 
     #[test]
     fn test_name() {
-        
+        let input = r#"fn bar(x: usize) -> usize"#;
+        let cm1 = CommentsRetriever::new(input).unwrap().unwrap();
+        assert_eq!(cm1.offset, 0);
+        let cm2 = CommentsRetriever::new(input).unwrap().unwrap();
+        assert_eq!(cm2.offset, input.len());
     }
 }
