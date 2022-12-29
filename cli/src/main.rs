@@ -137,9 +137,5 @@ mod tests {
     #[test]
     fn test_name() {
         let input = r#"fn bar(x: usize) -> usize"#;
-        let cm1 = CommentsRetriever::new(input).unwrap().unwrap();
-        assert_eq!(cm1.offset, 0);
-        let cm2 = CommentsRetriever::new(input).unwrap().unwrap();
-        assert_eq!(cm2.offset, input.len());
     }
 }
