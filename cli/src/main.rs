@@ -40,7 +40,7 @@ impl<'a> CommentsRetriever<'a> {
     }
 
     fn comments_between_raw(&self, begin: usize, end: usize) -> TokenStream {
-        let mut between = self.input[begin..end].trim();
+        let between = self.input[begin..end].trim();
         if between.is_empty() {
             TokenStream::new()
         } else {
