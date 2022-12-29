@@ -41,26 +41,29 @@ impl<'a> CommentsRetriever<'a> {
 
     fn comments_between_raw(&self, begin: usize, end: usize) -> TokenStream {
         let between = self.input[begin..end].trim();
-        if between.is_empty() {
-            TokenStream::new()
-        } else {
-            let comments = between
-                .split('\n')
-                .map(str::trim)
-                .filter(|s| s.len() > 1) // at least the `//` or /* chars
-                .map(|c| &c[2..]) // remove the `//` characters. TODO handle it with more care, inner/outer
-                .map(|comment| quote!(#[comment =  #comment]));
-            quote!(#(#comments)*)
-        }
+        let comments = between
+            .split('\n')
+            .map(str::trim)
+            .filter(|s| s.len() > 1) // at least the `//` or /* chars
+            .map(|c| &c[2..]) // remove the `//` characters. TODO handle it with more care, inner/outer
+            .map(|comment| quote!(#[comment =  #comment]));
+        quote!(#(#comments)*)
     }
 
     // TODO make this function not recursive
     fn handle_token_tree(&self, tt: TokenTree, end_last_span: usize) -> TokenStream {
+        let comments = if self.span_end(tt.span()) > end_last_span {
+            self.comments_between(end_last_span, tt.span())
+        } else {
+            // this mean the token has the same span as the previous one, meaning
+            // we're in expanded code. We will fast forward until returning to user code
+            println!("IN EXPANDED CODE");
+            return tt.into()
+        };
+
         match tt {
             TokenTree::Group(group) => {
-                println!("In GROUP");
-                // comments before the group
-                let comments = self.comments_between(end_last_span, group.span());
+                println!("In GROUP: {:?}", group.span());
                 let last_span_boundary = self.span_start(group.span()) + 1; // plus 1 to get over the brace/parenthesis/space
                 let inner_token_stream = if group.stream().is_empty() {
                     // if the group is empty, the only thing that can be inside is a comment
@@ -68,13 +71,11 @@ impl<'a> CommentsRetriever<'a> {
                 } else {
                     self.handle_token_stream(group.stream(), last_span_boundary)
                 };
-                let stream = quote!(#inner_token_stream);
-                let group_with_comments = Group::new(group.delimiter(), stream);
+                let group_with_comments = Group::new(group.delimiter(), inner_token_stream);
                 quote!(#comments #group_with_comments)
             }
             terminal_token => {
-                println!("In TERMINAL token");
-                let comments = self.comments_between(end_last_span, dbg!(&terminal_token).span());
+                println!("In TERMINAL token: {:?}", terminal_token.span());
                 quote!(#comments #terminal_token)
             }
         }
@@ -85,7 +86,7 @@ impl<'a> CommentsRetriever<'a> {
             let inner_span = inner_tt.span();
             let res = self.handle_token_tree(inner_tt, end_last_span);
             println!("res {res}");
-            end_last_span = self.span_end(inner_span);
+            end_last_span = dbg!(self.span_end(inner_span));
             res
         });
         quote!(#(#inner_token_stream)*)
@@ -117,8 +118,8 @@ fn main() {
 }
 #[cfg(test)]
 mod tests {
-    use syn::parse_quote;
     use pretty_assertions::assert_eq;
+    use syn::parse_quote;
 
     use super::*;
 
@@ -137,6 +138,32 @@ impl Thing {
         todo!()
     }
 }
+"#;
+        let x = parse_str(input).unwrap();
+        println!("RESULT: {x}");
+        let res = prettyplease::unparse(&parse_quote!(#x));
+        assert_eq!(input, res)
+    }
+
+    #[test]
+    #[ignore = "trailing comments not handled for the moment"]
+    fn test_trailing_comments() {
+        let input = r#"// comment on Thing
+#[cfg(feature = foo)]
+impl Thing {
+    // non-doc comment
+    fn f(&self) {
+        // foo
+        todo!()
+    }
+    // also comment
+    fn g(&self) {
+        todo!()
+    }
+}
+
+
+// this is a trailing comment, added after the last token
 "#;
         let x = parse_str(input).unwrap();
         println!("RESULT: {x}");

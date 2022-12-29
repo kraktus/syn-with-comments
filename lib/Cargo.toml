@@ -1,13 +1,13 @@
 [package]
 authors.workspace = true
+description.workspace = true
+documentation.workspace = true
 edition.workspace = true
+keywords.workspace = true
 license.workspace = true
 name = "syn-with-comments"
 repository.workspace = true
 version.workspace = true
-description.workspace = true
-documentation.workspace = true
-keywords.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,7 +15,7 @@ keywords.workspace = true
 
 [dependencies]
 proc-macro2.workspace = true
-syn.workspace = true
 quote.workspace = true
+syn.workspace = true
 
 [dev-dependencies]
