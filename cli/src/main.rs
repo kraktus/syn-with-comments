@@ -48,7 +48,6 @@ impl<'a> CommentsRetriever<'a> {
                 .split('\n')
                 .map(str::trim)
                 .filter(|s| s.len() > 1) // at least the `//` or /* chars
-                .map(|non_empty| dbg!(non_empty))
                 .map(|c| &c[2..]) // remove the `//` characters. TODO handle it with more care, inner/outer
                 .map(|comment| quote!(#[comment =  #comment]));
             quote!(#(#comments)*)
