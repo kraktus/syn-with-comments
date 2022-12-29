@@ -44,8 +44,6 @@ impl<'a> CommentsRetriever<'a> {
         if between.is_empty() {
             TokenStream::new()
         } else {
-            // FIXME why minus 1 needed?
-            //between = &between[..between.len() - 1];
             let comments = between
                 .split('\n')
                 .map(str::trim)
