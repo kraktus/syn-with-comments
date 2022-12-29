@@ -59,7 +59,8 @@ fn main() {
         let mut src = String::new();
         file.read_to_string(&mut src).expect("Unable to read file");
         let parsed_back_and_forth = prettyplease::unparse(
-            &syn::parse2(syn_with_comments::parse_str(&src).unwrap()).unwrap(),
+            &syn::parse2(syn_with_comments::parse_str(&src).expect("Parsing failed"))
+                .expect("Parsing to File failed"),
         );
         println!("diff of {file_path:?}");
         print!("{}", StrComparison::new(&src, &parsed_back_and_forth));

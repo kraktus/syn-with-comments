@@ -55,13 +55,13 @@ impl<'a> CommentsRetriever<'a> {
         } else {
             // this mean the token has the same span as the previous one, meaning
             // we're in expanded code. We will fast forward until returning to user code
-            println!("IN EXPANDED CODE");
+            //println!("IN EXPANDED CODE");
             return tt.into();
         };
 
         match tt {
             TokenTree::Group(group) => {
-                println!("In GROUP: {:?}", group.span());
+                //println!("In GROUP: {:?}", group.span());
                 let last_span_boundary = self.span_start(group.span()) + 1; // plus 1 to get over the brace/parenthesis/space
                 let inner_token_stream = if group.stream().is_empty() {
                     // if the group is empty, the only thing that can be inside is a comment
@@ -73,7 +73,7 @@ impl<'a> CommentsRetriever<'a> {
                 quote!(#comments #group_with_comments)
             }
             terminal_token => {
-                println!("In TERMINAL token: {:?}", terminal_token.span());
+                //println!("In TERMINAL token: {:?}", terminal_token.span());
                 quote!(#comments #terminal_token)
             }
         }
@@ -83,8 +83,8 @@ impl<'a> CommentsRetriever<'a> {
         let inner_token_stream = ts.into_iter().map(|inner_tt| {
             let inner_span = inner_tt.span();
             let res = self.handle_token_tree(inner_tt, end_last_span);
-            println!("res {res}");
-            end_last_span = dbg!(self.span_end(inner_span));
+            //println!("res {res}");
+            end_last_span = self.span_end(inner_span);
             res
         });
         quote!(#(#inner_token_stream)*)
@@ -96,7 +96,6 @@ impl<'a> CommentsRetriever<'a> {
 }
 
 pub fn parse_str(input: &str) -> syn::Result<TokenStream> {
-    dbg!(input.len());
     CommentsRetriever::new(input).map(CommentsRetriever::parse_str)
 }
 
@@ -124,7 +123,7 @@ impl Thing {
 }
 "#;
         let x = parse_str(input).unwrap();
-        println!("RESULT: {x}");
+        //println!("RESULT: {x}");
         let res = prettyplease::unparse(&parse_quote!(#x));
         assert_eq!(input, res)
     }
@@ -150,7 +149,7 @@ impl Thing {
 // this is a trailing comment, added after the last token
 "#;
         let x = parse_str(input).unwrap();
-        println!("RESULT: {x}");
+        //println!("RESULT: {x}");
         let res = prettyplease::unparse(&parse_quote!(#x));
         assert_eq!(input, res)
     }
