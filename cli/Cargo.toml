@@ -16,3 +16,5 @@ syn.workspace = true
 quote.workspace = true
 
 [dev-dependencies]
+prettyplease.workspace = true
+pretty_assertions.workspace = true

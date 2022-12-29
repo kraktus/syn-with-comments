@@ -40,16 +40,17 @@ impl<'a> CommentsRetriever<'a> {
     }
 
     fn comments_between_raw(&self, begin: usize, end: usize) -> TokenStream {
-        let mut between = self.input[begin..end + 1].trim();
+        let mut between = self.input[begin..end].trim();
         if between.is_empty() {
             TokenStream::new()
         } else {
             // FIXME why minus 1 needed?
-            between = &between[..between.len() - 1];
+            //between = &between[..between.len() - 1];
             let comments = between
                 .split('\n')
                 .map(str::trim)
-                .filter(|s| !s.is_empty())
+                .filter(|s| s.len() > 1) // at least the `//` or /* chars
+                .map(|non_empty| dbg!(non_empty))
                 .map(|c| &c[2..]) // remove the `//` characters. TODO handle it with more care, inner/outer
                 .map(|comment| quote!(#[comment =  #comment]));
             quote!(#(#comments)*)
@@ -115,27 +116,34 @@ fn main() {
             fn g(&self) {}
         }
     "#;
-    // let input = r#"(0) // foo
-    //     (// bar
-    //     )
-    // "#;
-
-    // let impl_block: TokenStream = syn::parse_str(input).unwrap();
-    // println!("without comments debug: {:?}", quote!(#impl_block));
-    //println!("without comments: {}", quote!(#impl_block));
-    //println!(
-    //    "with comments: {}",
-    //    handle_token_stream(&input, quote!(#impl_block), 0)
-    //);
     println!("with comments parse_str: {}", parse_str(input).unwrap());
 }
-
 #[cfg(test)]
 mod tests {
+    use syn::parse_quote;
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]
-    fn test_name() {
-        let input = r#"fn bar(x: usize) -> usize"#;
+    fn test_parse_str() {
+        let input = r#"// comment on Thing
+#[cfg(feature = foo)]
+impl Thing {
+    // non-doc comment
+    fn f(&self) {
+        // foo
+        todo!()
+    }
+    // also comment
+    fn g(&self) {
+        todo!()
+    }
+}
+"#;
+        let x = parse_str(input).unwrap();
+        println!("RESULT: {x}");
+        let res = prettyplease::unparse(&parse_quote!(#x));
+        assert_eq!(input, res)
     }
 }

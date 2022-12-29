@@ -27,3 +27,5 @@ syn = { version = "1.0.90", default-features = false, features = [
   "extra-traits",
 ] }
 quote = "1"
+prettyplease = "0.1.22"
+pretty_assertions = "1.3"
