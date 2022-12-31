@@ -1,5 +1,17 @@
 use proc_macro2::{Group, LineColumn, Span, TokenStream, TokenTree};
-use quote::quote;
+use quote::{quote, quote_spanned};
+use syn::parse::Parse;
+
+macro_rules! debug_println {
+        ($tt:tt) => {
+        #[cfg(feature = "debug")]
+        println!($tt);
+        };
+    ($tt:tt, $($e:expr),+) => {
+        #[cfg(feature = "debug")]
+        println!($tt, $($e),*);
+        }
+}
 
 struct CommentsRetriever<'a> {
     input: &'a str,
@@ -55,7 +67,7 @@ impl<'a> CommentsRetriever<'a> {
         } else {
             // this mean the token has the same span as the previous one, meaning
             // we're in expanded code. We will fast forward until returning to user code
-            //println!("IN EXPANDED CODE");
+            debug_println!("IN EXPANDED CODE");
             return tt.into();
         };
 
@@ -73,7 +85,7 @@ impl<'a> CommentsRetriever<'a> {
                 quote!(#comments #group_with_comments)
             }
             terminal_token => {
-                //println!("In TERMINAL token: {:?}", terminal_token.span());
+                debug_println!("In TERMINAL token: {:?}", terminal_token.span());
                 quote!(#comments #terminal_token)
             }
         }
@@ -82,27 +94,34 @@ impl<'a> CommentsRetriever<'a> {
     fn handle_token_stream(&self, ts: TokenStream, mut end_last_span: usize) -> TokenStream {
         let inner_token_stream = ts.into_iter().map(|inner_tt| {
             let inner_span = inner_tt.span();
-            let res = self.handle_token_tree(inner_tt, end_last_span);
-            //println!("res {res}");
-            end_last_span = self.span_end(inner_span);
+            let res = self.handle_token_tree(inner_tt, self.span_end(last_span));
+            debug_println!("res {res}");
+            last_span = inner_span;
             res
         });
         quote!(#(#inner_token_stream)*)
     }
 
-    fn parse_str(self) -> TokenStream {
-        self.handle_token_stream(self.ts.clone(), 0)
+    fn parse_str<T: Parse>(self) -> T {
+        let mut ts = self.handle_token_stream(self.ts.clone(), 0);
+        // now we must remove all
+        loop {
+            match syn::parse2(ts) {
+                Ok(parsed) => return parsed,
+                Err(e) => panic!("error: {e}, span: {:?}", e.span()),
+            }
+        }
     }
 }
 
-pub fn parse_str(input: &str) -> syn::Result<TokenStream> {
+pub fn parse_str<T: Parse>(input: &str) -> syn::Result<T> {
     CommentsRetriever::new(input).map(CommentsRetriever::parse_str)
 }
 
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
-    use syn::parse_quote;
+    use syn::File;
 
     use super::*;
 
@@ -122,9 +141,35 @@ impl Thing {
     }
 }
 "#;
-        let x = parse_str(input).unwrap();
-        //println!("RESULT: {x}");
-        let res = prettyplease::unparse(&parse_quote!(#x));
+        let x: File = parse_str(input).unwrap();
+        debug_println!("RESULT: {x:?}");
+        let res = prettyplease::unparse(&x);
+        assert_eq!(input, res)
+    }
+
+    #[test]
+    fn test_parse_str_empty_group() {
+        let input = r#"fn f(_: usize) {
+    // foo
+}
+"#;
+        let x: File = parse_str(input).unwrap();
+        debug_println!("RESULT: {x:?}");
+        let res = prettyplease::unparse(&x);
+        assert_eq!(input, res)
+    }
+
+    #[test]
+    fn test_parse_str2() {
+        let input = r#"fn xxx() {
+    let comments = between
+        .filter() // bar
+        .map(); // foo
+}
+"#;
+        let x: File = parse_str(input).unwrap();
+        debug_println!("RESULT: {x:?}");
+        let res = prettyplease::unparse(&x);
         assert_eq!(input, res)
     }
 
@@ -148,9 +193,8 @@ impl Thing {
 
 // this is a trailing comment, added after the last token
 "#;
-        let x = parse_str(input).unwrap();
-        //println!("RESULT: {x}");
-        let res = prettyplease::unparse(&parse_quote!(#x));
+        let x: File = parse_str(input).unwrap();
+        let res = prettyplease::unparse(&x);
         assert_eq!(input, res)
     }
 }

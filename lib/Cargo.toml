@@ -19,3 +19,8 @@ syn.workspace = true
 [dev-dependencies]
 pretty_assertions.workspace = true
 prettyplease.workspace = true
+
+
+[features]
+debug = []
+default = ["debug"]

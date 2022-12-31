@@ -54,7 +54,8 @@ fn main() {
                 .collect()
         })
         .unwrap_or_else(|_| vec![args.target]);
-    for file_path in entries.into_iter() {
+    let nb_files = entries.len();
+    for (i, file_path) in entries.into_iter().enumerate() {
         let mut file = File::open(&file_path).expect("reading source code failed");
         let mut src = String::new();
         file.read_to_string(&mut src).expect("Unable to read file");
@@ -64,11 +65,14 @@ fn main() {
         );
         println!("diff of {file_path:?}");
         print!("{}", StrComparison::new(&src, &parsed_back_and_forth));
-        println!("Continue? press `q` to exit");
-        let mut continue_ = String::new();
-        let _ = std::io::stdin().read_line(&mut continue_).unwrap();
-        if continue_ == "q" {
-            break;
+        // only ask if there are other files left to process
+        if i < nb_files - 1 {
+            println!("Continue? press `q` to exit");
+            let mut continue_ = String::new();
+            let _ = std::io::stdin().read_line(&mut continue_).unwrap();
+            if continue_ == "q" {
+                break;
+            }
         }
     }
 }
